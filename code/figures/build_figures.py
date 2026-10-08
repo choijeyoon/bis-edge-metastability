@@ -86,11 +86,21 @@ deltas = pd.read_csv(DATA / "edge_metastability" / "spec_curve_subject_deltas_S1
 grid = pd.read_csv(T / "gsr_grid_sex_HI.csv"); prim = pd.read_csv(T / "primary_H1.csv").iloc[0]
 
 ORANGE, TEAL, NEU = "#D8543F", "#2E7EB8", "#7f7f7f"
+NOGSR = "#5E3C99"   # convention without GSR; orange is reserved for the infection condition
 INF_L, NEU_L = "#F4B8AE", "#cfcfcf"
 YEO = {"Visual": "#7A1E7A", "Somatomotor": "#4A9BD5", "DorsalAttention": "#1B7B3A", "VentralAttention": "#C8A2C8",
        "Limbic": "#D9D67E", "Control": "#E69422", "DefaultMode": "#C64B4B"}
 NAMES = list(YEO); SHORT = ["VIS", "SOM", "DAN", "VAN", "LIM", "CON", "DMN"]
-blues = LinearSegmentedColormap.from_list("red_blue", ["#08306b", "#2171b5", "#6baed6", "#c6dbef", "#f2f2f2"])
+# d ramps used by the surface renders (render_brains.py): hue = convention, OKLCH lightness matched between the two
+RAMP = {"gsr": ["#08306b", "#2171b5", "#6baed6", "#c6dbef", "#f2f2f2"],
+        "none": ["#3b2264", "#765baf", "#ab99d7", "#dad4ee", "#f2f2f2"]}
+CMAP = {g: LinearSegmentedColormap.from_list(f"d_{g}", c) for g, c in RAMP.items()}
+
+
+def dbar_cb(fig, rect, gsr):
+    cax = fig.add_axes(rect); cb = fig.colorbar(plt.cm.ScalarMappable(cmap=CMAP[gsr], norm=plt.Normalize(-0.7, 0)), cax=cax)
+    cb.set_ticks([-0.7, -0.35, 0]); cb.ax.tick_params(labelsize=FS, length=2, pad=1.5); cb.outline.set_linewidth(0.4)
+    cb.set_label("Cohen's d", fontsize=FS, labelpad=2)
 netstats = pd.read_csv(T / "network_stats_sync_S1.csv"); nodestats = pd.read_csv(T / "node_stats_edgewise_S1.csv")
 nd = {g: pd.read_csv(DATA / "edge_metastability" / f"network_delta_sync_{g}_lag0_S1.csv", index_col=0).loc[ids] for g in ("none", "gsr")}
 yeo = np.array([{"Vis": 1, "SomMot": 2, "DorsAttn": 3, "SalVentAttn": 4, "Limbic": 5, "Cont": 6, "Default": 7}[s.split("_")[2]] for s in pd.read_csv(DATA / "atlases" / "schaefer400_7net_labels.tsv", sep="\t").name])
@@ -269,9 +279,7 @@ def figure1():
         if r_ == 2: ax.set_xticks([0, 60, 120]); ax.set_xlabel("Time (s)", labelpad=1)
         if r_ == 1: ax.text(-0.2, 1.2, "×", transform=ax.transAxes, fontsize=FS_T, ha="center", va="center", color=DARK)
         if r_ == 2: ax.text(-0.2, 1.2, "=", transform=ax.transAxes, fontsize=FS_T, ha="center", va="center", color=DARK)
-        if pid is not None:
-            bax.plot(*pix[pid], "o", ms=2.8, mfc="white", mec=c, mew=0.8, zorder=6)
-            fig.add_artist(ConnectionPatch(xyA=pix[pid], coordsA=bax.transData, xyB=(-0.33, 0.5), coordsB=ax.transAxes, color=c, lw=0.6, zorder=0))
+        if pid is not None: bax.plot(*pix[pid], "o", ms=2.8, mfc="white", mec=c, mew=0.8, zorder=6)
     # ================================================ c: edge time series, full width
     head(fig, 5, 55.5, "c", "Edge time series, all 79,800 pairs (1 in 25 shown)")
     axd = fig.add_axes(mm(XL, 61.5, XR - XL, 26))
@@ -295,9 +303,10 @@ def figure1():
     head(fig, 5, 93, "d", "Global cofluctuation R(t), mean over edges, same time axis")
     axe = fig.add_axes(mm(XL, 95.5, XR - XL, 22))
     for o, ty in win: axe.axvspan(o, o + 18, color=ORANGE if ty == "infection" else NEU, alpha=0.13, lw=0)
-    axe.plot(t, R, color=ORANGE, lw=0.7); hatch_excluded(axe, -0.1, 5.4)
+    RTOP = np.ceil(R.max() * 1.1 * 2) / 2
+    axe.plot(t, R, color=DARK, lw=0.7); hatch_excluded(axe, -0.1, RTOP)
     axe.set_xlim(0, TMAX); axe.set_xticks([0, 180, 360, 540, 720]); axe.set_xlabel("Time in run (s)", labelpad=1.5); axe.set_ylabel("R(t)", labelpad=2)
-    axe.set_ylim(-0.1, 5.4); axe.set_yticks([0, 2, 4])
+    axe.set_ylim(-0.1, RTOP); axe.set_yticks(np.arange(0, RTOP + 0.01, 1.0))
     # ================================================ e: EM from the concatenated windows
     head(fig, 5, 128.5, "e", "Edge metastability: windows of d, concatenated by condition; EM = SD of R(t)")
     for k, (ty, c, lab) in enumerate([("neutral", NEU, "neutral"), ("infection", ORANGE, "infection")]):
@@ -308,10 +317,10 @@ def figure1():
         xs = n * TR + 8
         ax.plot([xs, xs], [mu - sd, mu + sd], color=DARK, lw=1.0, solid_capstyle="butt", clip_on=False)
         for yy in (mu - sd, mu + sd): ax.plot([xs - 3, xs + 3], [yy, yy], color=DARK, lw=0.6, clip_on=False)
-        ax.text(xs + 8, mu, f"SD\n{sd:.2f}", fontsize=FS, va="center", ha="left", color=DARK)
-        ax.set_xlim(0, n * TR); ax.set_ylim(-0.1, 4.2); ax.set_yticks([0, 1, 2, 3]); clean(ax)
-        ax.text(0.015, 0.97, f"{lab} windows, {n // BLK} × 9 TR", transform=ax.transAxes, ha="left", va="top", fontsize=FS, color=c)
-        ax.text(0.015, 0.80, f"EM = {sd:.2f}", transform=ax.transAxes, ha="left", va="top", fontsize=FS, color=DARK)
+        ax.text(xs + 5, mu, "SD", fontsize=FS, va="center", ha="left", color=DARK)
+        ax.set_xlim(0, n * TR); ax.set_ylim(-0.1, RTOP); ax.set_yticks(np.arange(0, RTOP + 0.01, 1.0)); clean(ax)
+        ax.text(0.985, 0.97, f"{lab} windows, {n // BLK} × 9 TR", transform=ax.transAxes, ha="right", va="top", fontsize=FS, color=c)
+        ax.text(0.985, 0.80, f"EM = {sd:.2f}", transform=ax.transAxes, ha="right", va="top", fontsize=FS, color=DARK)
         ax.set_xticks([0, 90, 180, 270, 360]); ax.set_xlabel("Concatenated time (s)", labelpad=1.5)
         if k == 0: ax.set_ylabel("R(t)", labelpad=2)
     # ================================================ flow arrows, right margin
@@ -357,35 +366,33 @@ def figure2():
     ax.text(prim.d - 0.015, ax.get_ylim()[1] * 0.97, f"observed\np = {prim.p_perm:.3f}", color=ORANGE, ha="right", va="top", fontsize=FS)
     for r, (gsr, ttl, y0) in enumerate([("none", "Parcel-wise d, edge-wise definition, no GSR", 60), ("gsr", "Parcel-wise d, edge-wise definition, GSR", 99)]):
         n_sig = int(((nodestats.gsr == gsr) & (nodestats.lag == 0) & (nodestats.q < .05)).sum())
-        head(fig, 5, y0, "de"[r], f"{ttl}; outlined: q < .05, {n_sig} of 400 parcels")
+        head(fig, 5, y0, "de"[r], f"{ttl}; " + (f"outlined: q < .05, {n_sig} of 400 parcels" if n_sig else "no parcel at q < .05"))
         ax = fig.add_axes(mm(10, y0 + 3, 142, 33)); img_panel(ax, BR / f"map_{gsr}.png")
         for k, lab_ in enumerate(["L lateral", "L medial", "R lateral", "R medial"]):
             ax.text(0.125 + k * 0.25, -0.02, lab_, transform=ax.transAxes, ha="center", va="top", fontsize=FS, color="#666666")
-    cax = fig.add_axes(mm(156, 78, 2.6, 40)); cb = fig.colorbar(plt.cm.ScalarMappable(cmap=blues, norm=plt.Normalize(-0.7, 0)), cax=cax)
-    cb.set_ticks([-0.7, -0.35, 0]); cb.ax.tick_params(labelsize=FS, length=2, pad=1.5); cb.outline.set_linewidth(0.4); cb.set_label("Cohen's d", fontsize=FS, labelpad=2)
+    dbar_cb(fig, mm(156, 66, 2.6, 26), "none"); dbar_cb(fig, mm(156, 105, 2.6, 26), "gsr")
     print("Figure 2"); save(fig, "figure2")
 
 
 # ============================================================ Figure 4: networks, two conventions
 def figure4():  # networks
-    global FH; FH = 120.0
+    global FH; FH = 146.0
     fig = plt.figure(figsize=(FW * MM, FH * MM))
-    cw, x0 = 20.0, 14.0
-    for r, (gsr, ttl, c, y0) in enumerate([("none", "Within-network ΔEM, no GSR", ORANGE, 5), ("gsr", "Within-network ΔEM, GSR", TEAL, 63)]):
+    cw, x0, TH = 20.0, 14.0, 28.0   # TH: thumbnail height, lateral above medial
+    for r, (gsr, ttl, c, y0) in enumerate([("none", "Within-network ΔEM, no GSR", NOGSR, 5), ("gsr", "Within-network ΔEM, GSR", TEAL, 76)]):
         head(fig, 5, y0, "ab"[r], ttl)
-        vals = nd[gsr]; ymin, ymax = vals.values.min() - 0.05, vals.values.max() + 0.45 * np.ptp(vals.values)
+        vals = nd[gsr]; ymin, ymax = vals.values.min() - 0.12 * np.ptp(vals.values), vals.values.max() + 0.45 * np.ptp(vals.values)
         for k, name in enumerate(NAMES):
             q = netstats[(netstats.gsr == gsr) & (netstats.lag == 0) & (netstats.network == name)].q.iloc[0]
-            tax = fig.add_axes(mm(x0 + k * cw, y0 + 6.5, cw - 1.5, 13)); img_panel(tax, BR / f"net_{gsr}_{name}.png")
+            tax = fig.add_axes(mm(x0 + k * cw, y0 + 6.5, cw - 1.5, TH)); img_panel(tax, BR / f"net_{gsr}_{name}.png")
             tax.set_title(SHORT[k] + (" *" if q < .05 else ""), fontsize=FS, color=DARK, fontweight="bold", pad=1.5)
-            ax = fig.add_axes(mm(x0 + k * cw, y0 + 22, cw - 1.5, 30)); x = vals[name].values
+            ax = fig.add_axes(mm(x0 + k * cw, y0 + 6.5 + TH + 2.5, cw - 1.5, 30)); x = vals[name].values
             violin(ax, 0, x, c, width=0.9, jitter=0.12, ms=6); zero(ax)
             ax.set_xlim(-0.6, 0.6); ax.set_xticks([]); ax.set_ylim(ymin, ymax); ax.set_yticks([-0.5, 0.0, 0.5]); ax.spines["bottom"].set_visible(False)
             ax.text(0.5, 0.98, f"d = {cohen_d(x):.2f}", transform=ax.transAxes, ha="center", va="top", fontsize=FS)
             if k == 0: ax.set_ylabel("ΔEM within network")
             else: ax.set_yticklabels([])
-    cax = fig.add_axes(mm(157, 40, 2.6, 40)); cb = fig.colorbar(plt.cm.ScalarMappable(cmap=blues, norm=plt.Normalize(-0.7, 0)), cax=cax)
-    cb.set_ticks([-0.7, -0.35, 0]); cb.ax.tick_params(labelsize=FS, length=2, pad=1.5); cb.outline.set_linewidth(0.4); cb.set_label("Cohen's d, network", fontsize=FS, labelpad=2)
+    dbar_cb(fig, mm(157, 12.5, 2.6, 26), "none"); dbar_cb(fig, mm(157, 83.5, 2.6, 26), "gsr")
     print("Figure 4"); save(fig, "figure4")
 
 
@@ -400,7 +407,7 @@ def figure3():  # specification curve
     idx = np.random.default_rng(SEED).integers(0, 44, (2000, 44)); lo, hi = [], []
     for _, r in s.iterrows():
         x = piv[tuple(r[k] for k in keys)].values; xb = x[idx]; bs = xb.mean(1) / xb.std(1, ddof=1); l, h = np.percentile(bs, [2.5, 97.5]); lo.append(l); hi.append(h)
-    sig = (s.p_perm < .05).values; col = np.where(s.gsr == "gsr", TEAL, ORANGE)
+    sig = (s.p_perm < .05).values; col = np.where(s.gsr == "gsr", TEAL, NOGSR)
     ax.vlines(range(n), lo, hi, color="#dedede", lw=0.35, zorder=1)
     ax.scatter(np.arange(n)[sig], s.d[sig], s=5, c=col[sig], lw=0, zorder=3)
     ax.scatter(np.arange(n)[~sig], s.d[~sig], s=5, facecolor="white", edgecolor=col[~sig], lw=0.5, zorder=3)
@@ -412,7 +419,7 @@ def figure3():  # specification curve
     ax.text(0.99, 0.04, f"median d = {j.loc['median_d','observed']:.2f}; {int(j.loc['n_sig_negative','observed'])} of {n} significant, all negative\n"
                         f"joint permutation p: median {pf(j.loc['median_d','p'])}, count {pf(j.loc['n_sig_negative','p'])}, sum {pf(j.loc['sum_sig_d','p'])}",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=FS)
-    h = [plt.Line2D([], [], marker="o", ls="", color=ORANGE, ms=4, label="no GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=ORANGE, ms=4, label="no GSR, p ≥ .05"),
+    h = [plt.Line2D([], [], marker="o", ls="", color=NOGSR, ms=4, label="no GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=NOGSR, ms=4, label="no GSR, p ≥ .05"),
          plt.Line2D([], [], marker="o", ls="", color=TEAL, ms=4, label="GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=TEAL, ms=4, label="GSR, p ≥ .05")]
     ax.legend(handles=h, frameon=False, loc="upper left", ncol=2, columnspacing=1.2, handletextpad=0.4)
     head(fig, 5, 71, "b", "Effect by analysis choice")
@@ -425,7 +432,7 @@ def figure3():  # specification curve
     for key, levels, labs in rowspec:
         for lv, lb in zip(levels, labs):
             m = (s[key] == lv).values; dd = s.d[m]; frac = ((s.p_perm < .05) & m).sum() / m.sum()
-            c = TEAL if (key == "gsr" and lv == "gsr") else (ORANGE if key == "gsr" else "#444444")
+            c = TEAL if (key == "gsr" and lv == "gsr") else (NOGSR if key == "gsr" else "#444444")
             ax.plot([dd.quantile(.25), dd.quantile(.75)], [yy, yy], color=c, lw=1.0, zorder=2); ax.scatter(dd.median(), yy, s=18, color=c, zorder=3)
             axb.barh(yy, frac, height=0.6, color=c, lw=0, alpha=0.85); axb.text(frac + 0.03, yy, f"{frac:.2f}", va="center", fontsize=FS)
             ypos.append(yy); ylab.append(lb); yy -= 1
@@ -436,23 +443,25 @@ def figure3():  # specification curve
     head(fig, 118, 71, "c", "Shift × definition")
     ax = fig.add_axes(mm(131, 75, 33, 28))
     ems = ["concat", "within", "between", "edgewise"]; mks = ["o", "s", "^", "D"]; labels = ["synchrony-based", "within-block", "between-block", "edge-wise"]
-    for gsr, c in [("none", ORANGE), ("gsr", TEAL)]:
+    for gsr, c in [("none", NOGSR), ("gsr", TEAL)]:
         for em, mk in zip(ems, mks):
             ds = [cohen_d(sel(lag, em, gsr)) for lag in range(4)]
             ax.plot(range(4), ds, marker=mk, ms=3, lw=0.8, color=c, mfc=c if em in ("concat", "edgewise") else "white")
     zero(ax); ax.set_xticks(range(4)); ax.set_xlabel("Window shift (TR)"); ax.set_ylabel("Cohen's d"); ax.set_ylim(-0.85, 0.85); ax.set_yticks([-0.8, -0.4, 0.0])
     from matplotlib.lines import Line2D
     hd = [Line2D([], [], marker=mk, ms=3, lw=0, color=DARK, mfc=DARK if em in ("concat", "edgewise") else "white", label=lb) for em, mk, lb in zip(ems, mks, labels)]
-    hd += [Line2D([], [], lw=1.2, color=ORANGE, label="no GSR"), Line2D([], [], lw=1.2, color=TEAL, label="GSR")]
+    hd += [Line2D([], [], lw=1.2, color=NOGSR, label="no GSR"), Line2D([], [], lw=1.2, color=TEAL, label="GSR")]
     ax.legend(handles=hd, frameon=False, loc="upper left", ncol=2, handlelength=1.2, handletextpad=0.3, columnspacing=0.6, labelspacing=0.15, borderaxespad=0.0)
     head(fig, 120, 118, "d", "R(t) ≈ m(t)² without GSR")
     ax = fig.add_axes(mm(133, 122, 26, 26))
     ts = np.load(DATA / "example" / "sub-01_S1_schaefer400.npy").astype(float)[:, DUMMY:]
     z = zscore(ts); R = rts(z); m2 = z.mean(0) ** 2
-    ax.plot([0, 5.4], [0, 5.4], color=GRID, lw=0.6, zorder=0); ax.scatter(m2, R, s=3, color=DARK, lw=0, alpha=0.7)
-    ax.set_xlim(-0.1, 5.4); ax.set_ylim(-0.1, 5.4); ax.set_xticks([0, 2.5, 5]); ax.set_yticks([0, 2.5, 5])
+    top = np.ceil(max(R.max(), m2.max()) * 1.1 * 2) / 2; tk = np.arange(0, top + 0.01, 1.0)
+    ax.plot([0, top], [0, top], color=GRID, lw=0.6, zorder=0); ax.scatter(m2, R, s=3, color=DARK, lw=0, alpha=0.7)
+    ax.set_xlim(-0.1, top); ax.set_ylim(-0.1, top); ax.set_xticks(tk); ax.set_yticks(tk)
     ax.set_xlabel("m(t)², squared mean z"); ax.set_ylabel("R(t), no GSR")
-    ax.text(0.04, 0.96, f"one run, {ts.shape[1]} volumes\nr = {np.corrcoef(R, m2)[0, 1]:.3f}", transform=ax.transAxes, fontsize=FS, va="top")
+    rr = np.corrcoef(R, m2)[0, 1]; rtxt = "r > 0.9999" if rr > 0.9999 else f"r = {rr:.4f}"
+    ax.text(0.97, 0.04, f"one run, {ts.shape[1]} volumes\n{rtxt}", transform=ax.transAxes, fontsize=FS, va="bottom", ha="right")
     print("Figure 3"); save(fig, "figure3")
 
 
@@ -464,7 +473,7 @@ def figureS3():
     hi = ((q.HI_pre + q.HI_post) / 2).values.astype(float)
     convs = [("none", "concat", 0, "1, pre-specified"), ("gsr", "edgewise", 0, "4, edge-wise, GSR")]
     for k, (gsr, em, lag, lab) in enumerate(convs):
-        c = ORANGE if gsr == "none" else TEAL
+        c = NOGSR if gsr == "none" else TEAL
         head(fig, 5 + k * 46, 5, "ab"[k], f"Convention {lab}", color=c)
         ax = fig.add_axes(mm(14 + k * 46, 11, 34, 38)); x = sel(lag, em, gsr)
         violin(ax, 0, x[sex == "F"], c, width=0.8, jitter=0.12, ms=7); violin(ax, 1, x[sex == "M"], c, width=0.8, jitter=0.12, ms=7)
@@ -473,7 +482,7 @@ def figureS3():
         ax.text(0.5, 0.99, f"sex difference p = {r.p_sex:.3f}", transform=ax.transAxes, ha="center", va="top", fontsize=FS)
         if k == 0: ax.set_ylabel("ΔEM (infection − neutral)")
     for k, (gsr, em, lag, lab) in enumerate(convs):
-        c = ORANGE if gsr == "none" else TEAL
+        c = NOGSR if gsr == "none" else TEAL
         head(fig, 101 + k * 37, 5, "cd"[k], f"Trait HI, convention {lab.split(',')[0]}", color=c)
         ax = fig.add_axes(mm(110 + k * 37, 11, 25, 38)); x = sel(lag, em, gsr)
         ax.scatter(hi, x, s=9, color=c, lw=0, alpha=0.85)
@@ -489,7 +498,7 @@ def figureS3():
     convs6 = [("none", "concat", 0), ("none", "edgewise", 0), ("gsr", "concat", 0), ("gsr", "edgewise", 0), ("gsr", "concat", 2), ("gsr", "edgewise", 2)]
     s2df = pd.read_csv(T / "session2_reduced_grid.csv"); g4 = grid[grid.parc == "schaefer400"]
     for k, (gsr, em, lag) in enumerate(convs6):
-        c = ORANGE if gsr == "none" else TEAL; r = g4[(g4.ses == 1) & (g4.gsr == gsr) & (g4.em == em) & (g4.lag == lag)].iloc[0]
+        c = NOGSR if gsr == "none" else TEAL; r = g4[(g4.ses == 1) & (g4.gsr == gsr) & (g4.em == em) & (g4.lag == lag)].iloc[0]
         x = sel(lag, em, gsr); xF, xM = x[sex == "F"], x[sex == "M"]
         for dx, v, mk in [(-0.27, xF, "o"), (-0.09, xM, "s")]:
             d = cohen_d(v); lo, hi_ = d_ci(v); dbar(ax, k + dx, d, lo, hi_, c, mk, mfc=c if mk == "o" else "white")
@@ -499,10 +508,10 @@ def figureS3():
         d = cohen_d(x2); lo, hi_ = d_ci(x2); dbar(ax, k + 0.27, d, lo, hi_, c, "^", mfc="white")
     zero(ax); ax.set_xticks(range(6))
     ax.set_xticklabels(["1 synchrony\nno GSR", "2 edge-wise\nno GSR", "3 synchrony\nGSR", "4 edge-wise\nGSR", "5 synchrony\nGSR, +2 TR", "6 edge-wise\nGSR, +2 TR"])
-    ax.set_ylim(-1.4, 1.0); ax.set_ylabel("Cohen's d or r")
+    ax.set_ylim(-1.3, 1.1); ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0]); ax.set_ylabel("Cohen's d or r")
     h = [plt.Line2D([], [], marker="o", ls="", color="k", ms=3.5, label="d, women (S1)"), plt.Line2D([], [], marker="s", ls="", mfc="white", mec="k", ms=3.5, label="d, men (S1)"),
          plt.Line2D([], [], marker="D", ls="", mfc="white", mec="k", ms=3.5, label="r (trait HI, ΔEM)"), plt.Line2D([], [], marker="^", ls="", mfc="white", mec="k", ms=3.5, label="d, session 2")]
-    ax.legend(handles=h, frameon=False, loc="lower left", ncol=4, columnspacing=1.0, handletextpad=0.3)
+    ax.legend(handles=h, frameon=False, loc="upper left", ncol=4, columnspacing=1.0, handletextpad=0.3, borderaxespad=0.2)
     print("Figure S3"); save(fig, "figure_S3")
 
 
@@ -514,12 +523,12 @@ def figureS4():
     def sel2(lag, em, gsr):
         q = d2[(d2.lag == lag) & (d2.em == em) & (d2.gsr == gsr) & (d2.parc == "schaefer400") & (d2.ztime == "cond") & (d2.blockset == "all")]
         return q.set_index("sid").loc[ids, "delta"].values
-    for k, (gsr, em, lab, c) in enumerate([("none", "concat", "1, pre-specified", ORANGE), ("gsr", "edgewise", "4, edge-wise, GSR", TEAL)]):
+    for k, (gsr, em, lab, c) in enumerate([("none", "concat", "1, pre-specified", NOGSR), ("gsr", "edgewise", "4, edge-wise, GSR", TEAL)]):
         head(fig, 5 + k * 47, 5, "ab"[k], f"Retest, convention {lab.split(',')[0]}", color=c)
         ax = fig.add_axes(mm(14 + k * 47, 11, 30, 40)); x1, x2 = sel(0, em, gsr), sel2(0, em, gsr)
         ax.scatter(x1, x2, s=9, color=c, lw=0, alpha=0.85); zero(ax); zero(ax, "x")
         r, p = stats.pearsonr(x1, x2); ax.text(0.98, 0.98, f"r = {r:+.2f}\np = {p:.3f}", transform=ax.transAxes, ha="right", va="top", fontsize=FS)
-        ax.set_xlabel("ΔEM, session 1"); ax.set_ylabel("ΔEM, session 2"); ax.set_title(["pre-specified", "edge-wise, GSR"][k], fontsize=FS, color=c, pad=2)
+        ax.set_xlabel("ΔEM, session 1"); ax.set_ylabel("ΔEM, session 2"); ax.set_title(lab.split(", ", 1)[1], fontsize=FS, color=c, pad=2)
         lim = max(np.abs(np.r_[x1, x2])) * 1.1; ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim)
         tk = [-0.5, 0, 0.5] if lim > 0.5 else [-0.2, 0, 0.2]; ax.set_xticks(tk); ax.set_yticks(tk)
     # c: block-level EM vs within-condition rating, session 1
@@ -547,10 +556,17 @@ def figureS4():
 def figureS1():
     global FH; FH = 125.0
     # S1: indicator matrix (full specification curve)
-    s = summ.sort_values("d").reset_index(drop=True); n=len(s); sig=(s.p_perm<.05).values; col=np.where(s.gsr=="gsr",TEAL,ORANGE)
+    s = summ.sort_values("d").reset_index(drop=True); n=len(s); sig=(s.p_perm<.05).values; col=np.where(s.gsr=="gsr",TEAL,NOGSR)
     fig=plt.figure(figsize=(174*MM,125*MM)); gs_=fig.add_gridspec(2,1,left=0.14,right=0.98,top=0.95,bottom=0.06,hspace=0.08,height_ratios=[1,1.1])
     ax=fig.add_subplot(gs_[0]); ax.scatter(np.arange(n)[sig],s.d[sig],s=9,c=col[sig],lw=0); ax.scatter(np.arange(n)[~sig],s.d[~sig],s=9,facecolor="white",edgecolor=col[~sig],lw=0.6)
     ax.axhline(0,color="k",lw=0.6,ls=":"); ax.set_xticks([]); ax.set_ylabel("Cohen's d"); ax.set_xlim(-1,n); ax.set_yticks([-0.8,-0.4,0]); panel_label(ax,"a",dx=-0.1,dy=1.0)
+    p0 = s[(s.lag == 0) & (s.em == "concat") & (s.ztime == "cond") & (s.parc == "schaefer400") & (s.gsr == "none") & (s.blockset == "all")].index[0]
+    ax.scatter([p0], [s.d[p0]], s=80, facecolor="none", edgecolor="k", lw=1.0, zorder=4)
+    ax.annotate("pre-specified", (p0, s.d[p0]), xytext=(p0 - 60, s.d[p0] - 0.25), fontsize=FS, arrowprops=dict(arrowstyle="-", lw=0.6, color="k"))
+    h = [plt.Line2D([], [], marker="o", ls="", color=NOGSR, ms=4, label="no GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=NOGSR, ms=4, label="no GSR, p ≥ .05"),
+         plt.Line2D([], [], marker="o", ls="", color=TEAL, ms=4, label="GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=TEAL, ms=4, label="GSR, p ≥ .05")]
+    ax.legend(handles=h, frameon=False, loc="upper left", ncol=2, columnspacing=1.2, handletextpad=0.4); ax.set_ylim(top=0.45)
+    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
     ax2=fig.add_subplot(gs_[1],sharex=ax); panel_label(ax2,"b",dx=-0.1,dy=1.0)
     rowspec=[("gsr",["none","gsr"],["no GSR","GSR"]),("lag",[0,1,2,3],["shift 0","shift 1 TR","shift 2 TR","shift 3 TR"]),("em",["concat","within","between","edgewise"],["synchrony-based","within-block","between-block","edge-wise"]),("parc",[f"schaefer{k}" for k in (100,200,400,600,800,1000)],[f"Schaefer {k}" for k in (100,200,400,600,800,1000)]),("ztime",["cond","run"],["z within condition","z within run"]),("blockset",["all","common"],["all blocks","19/19 blocks"])]
     yy=0; yp=[]; yl=[]
