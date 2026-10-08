@@ -1,0 +1,2 @@
+test,n,mean_delta,d,p_perm,t,p_t,n_down
+"H1 S1 global EM, concat lag0, sign-flip permutation two-tailed",44,-0.058638262611600704,-0.31092829426366214,0.0422,-2.0624649775555617,0.045237473776234466,27

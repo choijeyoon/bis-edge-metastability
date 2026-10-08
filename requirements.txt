@@ -1,0 +1,12 @@
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+statsmodels>=0.14
+matplotlib>=3.7
+pillow>=9.0
+openpyxl>=3.1
+# imaging-derivative scripts only
+nibabel>=5.0
+# surface renders only
+brainspace>=0.1.10
+surfplot>=0.2

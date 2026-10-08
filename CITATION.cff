@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the paper and this repository."
+title: "Pathogen-related images reduce cortical edge metastability: a specification-curve analysis of a block-design fMRI study (code and data)"
+version: "2.0.0"
+date-released: 2026-10-07
+authors:
+  - family-names: Choi
+    given-names: Jeyoon
+    affiliation: "Graduate School of Medicine, Tohoku University"
+  - family-names: Berjaga-Buisan
+    given-names: Tomas
+    affiliation: "Center for Brain and Cognition, Universitat Pompeu Fabra"
+  - family-names: Garcia-Guzman
+    given-names: Elvira
+    affiliation: "Center for Brain and Cognition, Universitat Pompeu Fabra"
+  - family-names: Sugiura
+    given-names: Motoaki
+    affiliation: "Institute of Development, Aging and Cancer, Tohoku University"
+  - family-names: Deco
+    given-names: Gustavo
+    affiliation: "Center for Brain and Cognition, Universitat Pompeu Fabra; ICREA"
+repository-code: "https://github.com/choijeyoon/bis-edge-metastability"
+license: MIT
+keywords:
+  - edge metastability
+  - edge-centric connectivity
+  - behavioral immune system
+  - global signal regression
+  - specification curve
