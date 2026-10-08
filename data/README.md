@@ -19,6 +19,6 @@ All files are keyed by `SubjectID` (or `sid`), an integer from 1 to 55 assigned 
 | `example/sub-01_S1_schaefer400.npy` | — | 400 × 360 parcel time series of one participant (four dummy volumes included), used in Figures 1 and 3d |
 | `atlases/schaefer*_7net_labels.tsv` | parcel | TemplateFlow label tables; network is the third underscore-separated field of `name` |
 
-Instruments: `IND`/`COL` items are the 16-item horizontal–vertical individualism–collectivism scale (Triandis & Gelfand, 1998, JPSP 74, 118–128) in the Japanese translation of Choi & Sugiura (2026, Personality and Individual Differences 250, 113524); `PVD` items are the 15-item Perceived Vulnerability to Disease scale (Duncan, Schaller & Park, 2009) in the Japanese version of Fukukawa et al. (2014, Japanese Journal of Psychology 85, 188–195). PVD was administered but is not analyzed in the paper.
+Instruments: `IND`/`COL` items are the 16-item horizontal–vertical individualism–collectivism scale (Triandis & Gelfand, 1998, JPSP 74, 118–128) in the Japanese translation of Choi & Sugiura (2026, Personality and Individual Differences 250, 113524).
 
 Timing: TR = 2 s; the first four volumes are dummies; blocks are 18 s (one image for 9 s, rated three times, then 9 s fixation); block windows are 9 TR at onset. Session 1 and session 2 are two consecutive runs with identical parameters.
