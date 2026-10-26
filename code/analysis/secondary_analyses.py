@@ -23,7 +23,8 @@ SEED = 20260911
 
 g1 = pd.read_csv(EM / "global_S1.csv"); ids = g1.SubjectID.tolist(); n = len(ids)
 demo = pd.read_csv(DATA / "participants.csv")[["SubjectID", "Sex", "Age"]]
-g2 = pd.read_csv(EM / "global_S2.csv").set_index("SubjectID").loc[ids].reset_index()
+# run 2 has one participant fewer (sub-01: the run 2 file was a copy of run 1; see spec_curve.py); rows are NaN there
+g2 = pd.read_csv(EM / "global_S2.csv").set_index("SubjectID").reindex(ids).reset_index(); ok2 = g2.Delta.notna().values
 sex = demo.set_index("SubjectID").loc[ids, "Sex"].values
 fem = (sex == "F").astype(int)
 y = g1.Delta.values
@@ -51,7 +52,7 @@ def long_df(g, ses):
     a = g[["SubjectID"]].copy(); a["cond"] = 1; a["EM"] = g.EM_Inf.values; a["ses"] = ses
     b = g[["SubjectID"]].copy(); b["cond"] = 0; b["EM"] = g.EM_Neu.values; b["ses"] = ses
     return pd.concat([a, b])
-L = pd.concat([long_df(g1, 1), long_df(g2, 2)]).merge(demo, on="SubjectID")
+L = pd.concat([long_df(g1, 1), long_df(g2[ok2], 2)]).merge(demo, on="SubjectID")
 L["fem"] = (L.Sex == "F").astype(int); L["S2"] = (L.ses == 2).astype(int)
 L1 = L[L.ses == 1]
 m_sex = smf.mixedlm("EM ~ cond * fem", L1, groups=L1.SubjectID).fit(reml=False)
@@ -69,8 +70,8 @@ sec["p_holm"] = adj
 for sv in "FM":
     x = y[sex == sv]; d, p = signflip_p(x)
     sec = pd.concat([sec, pd.DataFrame([dict(test=f"H1 S1 {sv} only (descriptive)", beta=x.mean(), z=np.nan, p=p, BF01_bic=np.nan, p_holm=np.nan, d=d, n=len(x))])])
-d2, p2 = signflip_p(g2.Delta.values)
-sec = pd.concat([sec, pd.DataFrame([dict(test="H1 S2 (descriptive)", beta=g2.Delta.mean(), z=np.nan, p=p2, BF01_bic=np.nan, p_holm=np.nan, d=d2, n=n)])])
+d2, p2 = signflip_p(g2.Delta.values[ok2])
+sec = pd.concat([sec, pd.DataFrame([dict(test="H1 S2 (descriptive)", beta=g2.Delta.mean(), z=np.nan, p=p2, BF01_bic=np.nan, p_holm=np.nan, d=d2, n=int(ok2.sum()))])])
 sec.to_csv(OUT / "secondary_interactions.csv", index=False)
 
 # ---------------- decomposition by sex ----------------
@@ -168,7 +169,7 @@ for lag in (0, 2):
     for em in ["concat", "within", "between", "edgewise"]:
         d_ = base[(base.lag == lag) & (base.em == em)].set_index("sid").loc[ids, "delta"].values
         add(f"HI mean vs Delta EM: {em}, lag {lag}", hi, d_)
-add("HI mean vs Delta EM session 2", hi, g2.Delta.values)
+add("HI mean vs Delta EM session 2", hi[ok2], g2.Delta.values[ok2], n=int(ok2.sum()))
 pd.DataFrame(rows).to_csv(OUT / "hi_robustness.csv", index=False)
 
 # ---------------- power sensitivity ----------------
@@ -186,10 +187,10 @@ def grid(df, ses):
 s1, s2 = grid(sc, 1), grid(sc2, 2); s2.to_csv(OUT / "session2_reduced_grid.csv", index=False)
 both = pd.concat([s1, s2]); out = []
 for (ses, parc, gsr, lag, em), g in both.groupby(["ses", "parc", "gsr", "lag", "em"]):
-    d = g.set_index("sid").loc[ids, "delta"].values
-    dF, dM = d[sex == "F"], d[sex == "M"]; ti, pi = stats.ttest_ind(dF, dM); t, p = stats.ttest_1samp(d, 0)
-    r, pr = stats.pearsonr(hi, d); rho, prho = stats.spearmanr(hi, d)
-    out.append(dict(ses=ses, parc=parc, gsr=gsr, lag=lag, em=em, d=cohen_d(d), p=p, p_perm=signflip_p(d)[1], n_down=int((d < 0).sum()), d_F=cohen_d(dF), d_M=cohen_d(dM), p_sex=pi, r_HI=r, p_HI=pr, rho_HI=rho, p_rhoHI=prho))
+    d = g.set_index("sid").reindex(ids)["delta"].values; ok = ~np.isnan(d); d, sx, h = d[ok], sex[ok], hi[ok]
+    dF, dM = d[sx == "F"], d[sx == "M"]; ti, pi = stats.ttest_ind(dF, dM); t, p = stats.ttest_1samp(d, 0)
+    r, pr = stats.pearsonr(h, d); rho, prho = stats.spearmanr(h, d)
+    out.append(dict(ses=ses, parc=parc, gsr=gsr, lag=lag, em=em, n=int(ok.sum()), d=cohen_d(d), p=p, p_perm=signflip_p(d)[1], n_down=int((d < 0).sum()), d_F=cohen_d(dF), d_M=cohen_d(dM), p_sex=pi, r_HI=r, p_HI=pr, rho_HI=rho, p_rhoHI=prho))
 pd.DataFrame(out).to_csv(OUT / "gsr_grid_sex_HI.csv", index=False)
 piv = s1[s1.lag == 0].pivot_table(index="sid", columns=["parc", "gsr", "em"], values="delta").loc[ids]
 piv.corr().to_csv(OUT / "individual_difference_correlations_S1_lag0.csv")

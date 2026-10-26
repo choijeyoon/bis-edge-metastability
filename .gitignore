@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+_to_delete/
+.DS_Store

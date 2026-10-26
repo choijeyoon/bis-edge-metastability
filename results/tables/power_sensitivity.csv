@@ -1,4 +1,4 @@
 quantity,value
-"minimum detectable d, n=44, alpha=.05 two-tailed, power=.80",0.4320863656392917
-"n required for d=0.30, alpha=.05 two-tailed, power=.80",89.14936472045824
-achieved power for d=0.30 at n=44,0.49425725414580907
+"minimum detectable d, n=44, alpha=.05 two-tailed, power=.80",0.43208636563929187
+"n required for d=0.30, alpha=.05 two-tailed, power=.80",89.14936472045834
+achieved power for d=0.30 at n=44,0.4942572541458088

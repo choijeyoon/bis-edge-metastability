@@ -23,6 +23,8 @@ TR, DUMMY, BLK = 2.0, 4, 9
 NAMES = ["Visual", "Somatomotor", "DorsalAttention", "VentralAttention", "Limbic", "Control", "DefaultMode"]
 KEY = {"Vis": 1, "SomMot": 2, "DorsAttn": 3, "SalVentAttn": 4, "Limbic": 5, "Cont": 6, "Default": 7}
 GSRS = ("none", "gsr"); LAGS = (0, 2)
+# sub-01 run 2: the exported BOLD file is a copy of run 1 (identical NIfTI; the DICOM export holds series 201, EPI_S1); excluded
+INVALID = {(1, 2)}   # (participant, run)
 
 
 def zscore(ts):
@@ -108,7 +110,7 @@ def aggregate(root, out, yeo, subs):
         cache = out / f"_cache_maps_S{ses}"; node = {}; net = {}; net_inf = {}; net_neu = {}; ids = []
         for sid in subs:
             f = cache / f"sub-{sid:02d}.npz"
-            if not f.exists(): continue
+            if not f.exists() or (sid, ses) in INVALID: continue
             d = np.load(f); ids.append(sid)
             for gsr in GSRS:
                 for lag in LAGS:
@@ -163,7 +165,7 @@ def main():
         cache = out / f"_cache_maps_S{ses}"; cache.mkdir(exist_ok=True)
         for sid in subs:
             f = cache / f"sub-{sid:02d}.npz"
-            if f.exists() or not (pm / f"sub-{sid:02d}/sub-{sid:02d}_S{ses}_schaefer400.npy").exists(): continue
+            if (sid, ses) in INVALID or f.exists() or not (pm / f"sub-{sid:02d}/sub-{sid:02d}_S{ses}_schaefer400.npy").exists(): continue
             if time.time() - t0 > a.budget: pending += 1; continue
             res = per_subject(sid, ses, root, yeo); np.savez(f, **res); print(f"S{ses} sub-{sid:02d} {time.time() - t0:.0f}s", flush=True)
     if pending: print(f"{pending} subject-sessions pending; rerun"); return

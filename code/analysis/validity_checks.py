@@ -15,7 +15,8 @@ for gsr in ("none", "gsr"):
     for em in ("concat", "edgewise"):
         for lag in (0, 2):
             f = lambda d: d[(d.parc == "schaefer400") & (d.ztime == "cond") & (d.blockset == "all") & (d.gsr == gsr) & (d.em == em) & (d.lag == lag)].set_index("sid")
-            a, b = f(s1), f(s2).loc[f(s1).index]
+            idx = f(s1).index.intersection(f(s2).index)   # participants with both runs (run 2 of sub-01 excluded)
+            a, b = f(s1).loc[idx], f(s2).loc[idx]
             r, p = stats.pearsonr(a.delta, b.delta); rho = stats.spearmanr(a.delta, b.delta)[0]
             rows.append(dict(GSR="no" if gsr == "none" else "yes", definition={"concat": "concatenated", "edgewise": "edge-wise"}[em], shift=lag, n=len(a),
                              r_delta=r, p_delta=p, rho_delta=rho, r_EM_infection=stats.pearsonr(a.em_inf, b.em_inf)[0], r_EM_neutral=stats.pearsonr(a.em_neu, b.em_neu)[0]))

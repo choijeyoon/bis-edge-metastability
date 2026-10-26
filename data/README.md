@@ -14,11 +14,14 @@ All files are keyed by `SubjectID` (or `sid`), an integer from 1 to 55 assigned 
 | `questionnaires/scores.csv` | participant | scale sums `IND`, `HI`, `VI`, `COL`, `HC`, `VC` at pre and post; `PVD_pre`, `PVD_post` (reverse-keyed, rebuilt by identifier) |
 | `ratings/block_ratings.csv` | block | in-scanner ratings (1-4) of `disgust`, `fear`, `infect` (infection threat) and their `mean3`, keyed by `sid`, `session`, `order` |
 | `motion/fd_per_block.csv` | block | `block_mean_fd` (mm, fMRIPrep framewise displacement) with `subject`, `session`, `trial_type`, `block_onset` |
-| `motion/fd_per_run.csv`, `fd_per_subject_*.csv` | run / participant | summary FD statistics |
+| `motion/fd_per_run.csv`, `fd_per_subject_session.csv` | run / participant | mean, maximum and outlier counts of FD per run; mean FD per participant and run |
+| `motion/fd_per_subject_condition.csv` | participant | mean block FD by condition in run 1, blocks 2-40 (the blocks analyzed), as reported in the Results |
 | `stimuli/stimulus_features.csv` (images not included) | image feature | means, SDs, t, d and FDR p for the ten low-level features (Supplementary Table S1) |
 | `example/sub-01_S1_schaefer400.npy` | — | 400 × 360 parcel time series of one participant (four dummy volumes included), used in Figures 1 and 3d |
 | `atlases/schaefer*_7net_labels.tsv` | parcel | TemplateFlow label tables; network is the third underscore-separated field of `name` |
 
-Instruments: `IND`/`COL` items are the 16-item horizontal–vertical individualism–collectivism scale (Triandis & Gelfand, 1998, JPSP 74, 118–128) in the Japanese translation of Choi & Sugiura (2026, Personality and Individual Differences 250, 113524).
+Instruments: `IND`/`COL` items are the 16-item horizontal–vertical individualism–collectivism scale (Triandis & Gelfand, 1998, JPSP 74, 118–128), translated into Japanese for this study.
 
-Timing: TR = 2 s; the first four volumes are dummies; blocks are 18 s (one image for 9 s, rated three times, then 9 s fixation); block windows are 9 TR at onset. Session 1 and session 2 are two consecutive runs with identical parameters.
+Timing: TR = 2 s; the first four volumes are dummies; blocks are 18 s (one image for 9 s, rated three times, then 9 s fixation); block windows are 9 TR at onset. Session 1 and session 2 are two consecutive runs with identical parameters (run 1 and run 2 in the paper).
+
+Exclusion: for participant 1 the file exported as run 2 was a second copy of run 1 (identical image data and acquisition time). That run is excluded: participant 1 has no rows for session 2 in `edge_metastability/` and `motion/`, and all run 2 and across-run results use n = 43. The exclusion is coded as `INVALID = {(1, 2)}` in the three scripts that read the imaging derivatives. Participant 1's run 2 rating log is genuine and is kept in `ratings/`, but it is not used, because it has no imaging data to pair with.

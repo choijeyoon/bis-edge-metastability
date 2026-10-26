@@ -1,7 +1,7 @@
-"""Figures 1-4 and S1-S4 of "Pathogen-related images reduce cortical edge metastability" (Network Neuroscience).
+"""Figures 1-5 and S1-S4 of "Infection-related images reduce cortical edge metastability" (Network Neuroscience).
 Every number is read from results/tables/*.csv or data/; nothing is typed in. Canvas 174 mm, 7-pt floor, one typeface.
 Surface renders (figures/brains/*.png) come from code/figures/render_brains.py (brainspace + surfplot).
-usage: python code/figures/build_figures.py [1 2 3 4 S1 S2 S3 S4]   (default: all)
+usage: python code/figures/build_figures.py [1 2 3 4 5 S1 S2 S3 S4]   (default: all)
 """
 import sys
 from pathlib import Path
@@ -137,7 +137,9 @@ def zscore(ts):
 def rts(z):
     n = z.shape[0]; s = z.sum(0); s2 = (z * z).sum(0); return 0.5 * (s ** 2 - s2) / (n * (n - 1) / 2)
 
-FONT = "Liberation Sans"; FS, FS_T, FS_L = 7, 8, 9
+from matplotlib import font_manager as _fm
+FONT = "Liberation Sans" if any(f.name == "Liberation Sans" for f in _fm.fontManager.ttflist) else "Arial"   # Arial has the same metrics
+FS, FS_T, FS_L = 7, 8, 9
 plt.rcParams.update({"font.family": FONT, "font.size": FS, "axes.labelsize": FS, "axes.titlesize": FS, "xtick.labelsize": FS, "ytick.labelsize": FS,
                      "legend.fontsize": FS, "svg.fonttype": "none", "axes.linewidth": 0.5,
                      "mathtext.fontset": "custom", "mathtext.rm": FONT, "mathtext.it": f"{FONT}:italic", "mathtext.bf": f"{FONT}:bold",
@@ -340,7 +342,7 @@ def figure2():
     global FH; FH = 138.0
     fig = plt.figure(figsize=(FW * MM, FH * MM))
     neu, inf, y = g1.EM_Neu.values, g1.EM_Inf.values, g1.Delta.values
-    head(fig, 5, 5, "a", "Pre-specified test, session 1 (n = 44)")
+    head(fig, 5, 5, "a", "Pre-specified test, run 1 (n = 44)")
     ax = fig.add_axes(mm(14, 12, 40, 37))
     rng0 = np.random.default_rng(0); jx = rng0.uniform(-0.08, 0.08, 44)
     violin(ax, 0, neu, NEU, width=0.8, pts=False, ms=8); violin(ax, 1, inf, ORANGE, width=0.8, pts=False, ms=8)
@@ -415,9 +417,9 @@ def figure3():  # specification curve
     ax.scatter([p0], [s.d[p0]], s=70, facecolor="none", edgecolor="k", lw=1.0, zorder=4)
     ax.annotate("pre-specified", (p0, s.d[p0]), xytext=(p0 - 90, s.d[p0] - 0.3), fontsize=FS, arrowprops=dict(arrowstyle="-", lw=0.6, color="k"))
     zero(ax); ax.set_xlim(-2, n + 1); ax.set_xticks([0, 100, 200, 300, 400, 480]); ax.set_xlabel("Specification rank"); ax.set_ylabel("Cohen's d (infection − neutral)"); ax.set_ylim(min(-1.1, np.floor((min(lo) - 0.05) * 10) / 10), 0.45); ax.set_yticks([-1.0, -0.5, 0.0])
-    j = joint.set_index("statistic"); pf = lambda p: f"{p:.4f}" if p > 0 else "< 0.0001"
+    j = joint.set_index("statistic"); pf = lambda p: "< .001" if p < .001 else f"= {p:.3f}".replace("0.", ".")   # p < .001: fewer than 10 of 10,000 draws
     ax.text(0.99, 0.04, f"median d = {j.loc['median_d','observed']:.2f}; {int(j.loc['n_sig_negative','observed'])} of {n} significant, all negative\n"
-                        f"joint permutation p: median {pf(j.loc['median_d','p'])}, count {pf(j.loc['n_sig_negative','p'])}, sum {pf(j.loc['sum_sig_d','p'])}",
+                        f"joint permutation: median p {pf(j.loc['median_d','p'])}, count p {pf(j.loc['n_sig_negative','p'])}, sum p {pf(j.loc['sum_sig_d','p'])}",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=FS)
     h = [plt.Line2D([], [], marker="o", ls="", color=NOGSR, ms=4, label="no GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=NOGSR, ms=4, label="no GSR, p ≥ .05"),
          plt.Line2D([], [], marker="o", ls="", color=TEAL, ms=4, label="GSR, p < .05"), plt.Line2D([], [], marker="o", ls="", mfc="white", mec=TEAL, ms=4, label="GSR, p ≥ .05")]
@@ -465,6 +467,44 @@ def figure3():  # specification curve
     print("Figure 3"); save(fig, "figure3")
 
 
+# ============================================================ Figure 5: control analyses and run 2
+def figure5():
+    global FH; FH = 84.0
+    fig = plt.figure(figsize=(FW * MM, FH * MM))
+    sub = pd.read_csv(T / "control_analyses_subject.csv")
+    rows = [("base", "all", None, "as in the curve"), ("evoked", "all", None, "evoked response removed"), ("trend", "all", None, "detrended"),
+            ("motion24", "all", None, "24 motion parameters"), ("wmcsf", "all", None, "white matter and CSF"), ("nuisance", "all", None, "all three (nuisance)"),
+            ("both", "all", None, "nuisance + evoked"), ("nuisance", "all", "gsr_cond", "nuisance, GS fit per condition"), ("nuisance", "alt", None, "nuisance, blocks 7–40")]
+    series = [("none", "S1", NOGSR, NOGSR, 0.27), ("none", "S2", NOGSR, "white", 0.09), ("gsr", "S1", TEAL, TEAL, -0.09), ("gsr", "S2", TEAL, "white", -0.27)]
+    def dval(gsr, run, lag, var, bs, m):
+        g = sub[(sub.gsr == gsr) & (sub.run == run) & (sub.lag == lag) & (sub.variant == var) & (sub.blockset == bs)]
+        if g.empty: return None
+        p = g.pivot(index="sid", columns="cond", values=m); x = (p.infection - p.neutral).dropna().values
+        lo, hi = d_ci(x); return cohen_d(x), lo, hi
+    panels = [("em_sync", 0, "shift 0"), ("em_sync", 2, "shift 2 TR"), ("em_edge", 0, "shift 0"), ("em_edge", 2, "shift 2 TR")]
+    x0, w, gap = 46, 28.5, 3.5
+    for g, name in enumerate(["Synchrony-based", "Edge-wise"]):
+        xa, xb = x0 + 2 * g * (w + gap), x0 + 2 * g * (w + gap) + 2 * w + gap
+        fig.text(fx((xa + xb) / 2), fy(5), name, fontsize=FS_T, fontweight="bold", ha="center", va="baseline")
+        fig.add_artist(plt.Line2D([fx(xa), fx(xb)], [fy(6.5), fy(6.5)], color=DARK, lw=0.5))
+    for k, (m, lag, title) in enumerate(panels):
+        head(fig, x0 + k * (w + gap) - 3, 12, "abcd"[k], None); fig.text(fx(x0 + k * (w + gap) + 2), fy(12), title, fontsize=FS, va="baseline")
+        ax = fig.add_axes(mm(x0 + k * (w + gap), 15, w, 56))
+        for i, (var, bs, gover, lab) in enumerate(rows):
+            for gsr, run, c, fc, off in series:
+                if gover and gsr == "none": continue
+                r = dval(gover if (gover and gsr == "gsr") else gsr, run, lag, var, bs, m)
+                if r is None: continue
+                ax.errorbar(r[0], -i + off, xerr=[[r[0] - r[1]], [r[2] - r[0]]], fmt="o", color=c, mfc=fc, mec=c, ms=2.6, mew=0.6, lw=0.5, capsize=0, zorder=3)
+            if i % 2 == 0: ax.axhspan(-i - 0.5, -i + 0.5, color="#f3f3f3", lw=0, zorder=0)
+        zero(ax, "x"); ax.set_xlim(-1.15, 0.65); ax.set_xticks([-1.0, -0.5, 0.0, 0.5]); ax.set_ylim(-len(rows) + 0.5, 0.5); ax.set_xlabel("Cohen's d")
+        ax.set_yticks(-np.arange(len(rows))); ax.set_yticklabels([r[3] for r in rows] if k == 0 else []); ax.tick_params(axis="y", length=0); ax.spines["left"].set_visible(False)
+    from matplotlib.lines import Line2D
+    hd = [Line2D([], [], marker="o", ls="", color=c, mfc=fc, mec=c, ms=3, label=f"{'GSR' if gsr == 'gsr' else 'no GSR'}, run {run[1]}") for gsr, run, c, fc, _ in series]
+    fig.legend(handles=hd, frameon=False, loc="lower center", ncol=4, bbox_to_anchor=(0.6, 0.0), handletextpad=0.3, columnspacing=1.5)
+    print("Figure 5"); save(fig, "figure5")
+
+
 # ============================================================ Figure S3: sex, HI, six conventions (old Figure 5)
 def figureS3():
     global FH; FH = 125.0
@@ -474,7 +514,7 @@ def figureS3():
     convs = [("none", "concat", 0, "1, pre-specified"), ("gsr", "edgewise", 0, "4, edge-wise, GSR")]
     for k, (gsr, em, lag, lab) in enumerate(convs):
         c = NOGSR if gsr == "none" else TEAL
-        head(fig, 5 + k * 46, 5, "ab"[k], f"Convention {lab}", color=c)
+        head(fig, 5 + k * 46, 5, "ab"[k], f"Specification {lab}", color=c)
         ax = fig.add_axes(mm(14 + k * 46, 11, 34, 38)); x = sel(lag, em, gsr)
         violin(ax, 0, x[sex == "F"], c, width=0.8, jitter=0.12, ms=7); violin(ax, 1, x[sex == "M"], c, width=0.8, jitter=0.12, ms=7)
         r = grid[(grid.parc == "schaefer400") & (grid.ses == 1) & (grid.gsr == gsr) & (grid.em == em) & (grid.lag == lag)].iloc[0]
@@ -483,7 +523,7 @@ def figureS3():
         if k == 0: ax.set_ylabel("ΔEM (infection − neutral)")
     for k, (gsr, em, lag, lab) in enumerate(convs):
         c = NOGSR if gsr == "none" else TEAL
-        head(fig, 101 + k * 37, 5, "cd"[k], f"Trait HI, convention {lab.split(',')[0]}", color=c)
+        head(fig, 101 + k * 37, 5, "cd"[k], f"Trait HI, specification {lab.split(',')[0]}", color=c)
         ax = fig.add_axes(mm(110 + k * 37, 11, 25, 38)); x = sel(lag, em, gsr)
         ax.scatter(hi, x, s=9, color=c, lw=0, alpha=0.85)
         Xd = np.column_stack([np.ones(44), hi]); beta = np.linalg.lstsq(Xd, x, rcond=None)[0]; xx = np.linspace(hi.min(), hi.max(), 50)
@@ -493,7 +533,7 @@ def figureS3():
         ax.text(0.98, 0.02, f"r = {r:+.2f}, p = {p:.3f}\nρ = {rho:+.2f}, p = {prho:.3f}", transform=ax.transAxes, va="bottom", ha="right", fontsize=FS)
         ax.set_xlabel("Trait HI"); zero(ax); ax.set_xticks([5, 15, 25]); yl = ax.get_ylim(); ax.set_ylim(yl[0] - 0.4 * (yl[1] - yl[0]), yl[1])
         if k == 0: ax.set_ylabel("ΔEM")
-    head(fig, 5, 64, "e", "Across six conventions")
+    head(fig, 5, 64, "e", "Across six specifications")
     ax = fig.add_axes(mm(14, 68, 150, 42))
     convs6 = [("none", "concat", 0), ("none", "edgewise", 0), ("gsr", "concat", 0), ("gsr", "edgewise", 0), ("gsr", "concat", 2), ("gsr", "edgewise", 2)]
     s2df = pd.read_csv(T / "session2_reduced_grid.csv"); g4 = grid[grid.parc == "schaefer400"]
@@ -504,13 +544,13 @@ def figureS3():
             d = cohen_d(v); lo, hi_ = d_ci(v); dbar(ax, k + dx, d, lo, hi_, c, mk, mfc=c if mk == "o" else "white")
         zf = np.arctanh(r.r_HI); se = 1 / np.sqrt(41)
         dbar(ax, k + 0.09, r.r_HI, np.tanh(zf - 1.96 * se), np.tanh(zf + 1.96 * se), c, "D", mfc="white")
-        x2 = s2df[(s2df.parc == "schaefer400") & (s2df.gsr == gsr) & (s2df.em == em) & (s2df.lag == lag)].set_index("sid").loc[ids, "delta"].values
+        x2 = s2df[(s2df.parc == "schaefer400") & (s2df.gsr == gsr) & (s2df.em == em) & (s2df.lag == lag)].set_index("sid").reindex(ids)["delta"].dropna().values
         d = cohen_d(x2); lo, hi_ = d_ci(x2); dbar(ax, k + 0.27, d, lo, hi_, c, "^", mfc="white")
     zero(ax); ax.set_xticks(range(6))
     ax.set_xticklabels(["1 synchrony\nno GSR", "2 edge-wise\nno GSR", "3 synchrony\nGSR", "4 edge-wise\nGSR", "5 synchrony\nGSR, +2 TR", "6 edge-wise\nGSR, +2 TR"])
     ax.set_ylim(-1.3, 1.1); ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0]); ax.set_ylabel("Cohen's d or r")
-    h = [plt.Line2D([], [], marker="o", ls="", color="k", ms=3.5, label="d, women (S1)"), plt.Line2D([], [], marker="s", ls="", mfc="white", mec="k", ms=3.5, label="d, men (S1)"),
-         plt.Line2D([], [], marker="D", ls="", mfc="white", mec="k", ms=3.5, label="r (trait HI, ΔEM)"), plt.Line2D([], [], marker="^", ls="", mfc="white", mec="k", ms=3.5, label="d, session 2")]
+    h = [plt.Line2D([], [], marker="o", ls="", color="k", ms=3.5, label="d, women (run 1)"), plt.Line2D([], [], marker="s", ls="", mfc="white", mec="k", ms=3.5, label="d, men (run 1)"),
+         plt.Line2D([], [], marker="D", ls="", mfc="white", mec="k", ms=3.5, label="r (trait HI, ΔEM)"), plt.Line2D([], [], marker="^", ls="", mfc="white", mec="k", ms=3.5, label="d, run 2")]
     ax.legend(handles=h, frameon=False, loc="upper left", ncol=4, columnspacing=1.0, handletextpad=0.3, borderaxespad=0.2)
     print("Figure S3"); save(fig, "figure_S3")
 
@@ -522,17 +562,17 @@ def figureS4():
     d2 = pd.read_csv(DATA / "edge_metastability" / "spec_curve_subject_deltas_S2.csv")
     def sel2(lag, em, gsr):
         q = d2[(d2.lag == lag) & (d2.em == em) & (d2.gsr == gsr) & (d2.parc == "schaefer400") & (d2.ztime == "cond") & (d2.blockset == "all")]
-        return q.set_index("sid").loc[ids, "delta"].values
+        return q.set_index("sid").reindex(ids)["delta"].values   # NaN for participants without a valid run 2
     for k, (gsr, em, lab, c) in enumerate([("none", "concat", "1, pre-specified", NOGSR), ("gsr", "edgewise", "4, edge-wise, GSR", TEAL)]):
-        head(fig, 5 + k * 47, 5, "ab"[k], f"Retest, convention {lab.split(',')[0]}", color=c)
-        ax = fig.add_axes(mm(14 + k * 47, 11, 30, 40)); x1, x2 = sel(0, em, gsr), sel2(0, em, gsr)
+        head(fig, 5 + k * 47, 5, "ab"[k], f"Retest, specification {lab.split(',')[0]}", color=c)
+        ax = fig.add_axes(mm(14 + k * 47, 11, 30, 40)); x1, x2 = sel(0, em, gsr), sel2(0, em, gsr); ok = ~np.isnan(x2); x1, x2 = x1[ok], x2[ok]
         ax.scatter(x1, x2, s=9, color=c, lw=0, alpha=0.85); zero(ax); zero(ax, "x")
         r, p = stats.pearsonr(x1, x2); ax.text(0.98, 0.98, f"r = {r:+.2f}\np = {p:.3f}", transform=ax.transAxes, ha="right", va="top", fontsize=FS)
-        ax.set_xlabel("ΔEM, session 1"); ax.set_ylabel("ΔEM, session 2"); ax.set_title(lab.split(", ", 1)[1], fontsize=FS, color=c, pad=2)
+        ax.set_xlabel("ΔEM, run 1"); ax.set_ylabel("ΔEM, run 2"); ax.set_title(lab.split(", ", 1)[1], fontsize=FS, color=c, pad=2)
         lim = max(np.abs(np.r_[x1, x2])) * 1.1; ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim)
         tk = [-0.5, 0, 0.5] if lim > 0.5 else [-0.2, 0, 0.2]; ax.set_xticks(tk); ax.set_yticks(tk)
     # c: block-level EM vs within-condition rating, session 1
-    head(fig, 101, 5, "c", "Block EM vs in-scanner rating, session 1")
+    head(fig, 101, 5, "c", "Block EM vs in-scanner rating, run 1")
     ax = fig.add_axes(mm(114, 11, 50, 40))
     bl = pd.read_csv(DATA / "edge_metastability" / "block_level_EM.csv"); rt = pd.read_csv(DATA / "ratings" / "block_ratings.csv")
     m = bl.merge(rt, on=["sid", "session", "order"]); m = m[m.session == 1].dropna(subset=["mean3"]).copy()
@@ -546,7 +586,7 @@ def figureS4():
         q = m[m.cond == cond]; cut = pd.cut(q.rat_wc, bins); g = q.groupby(cut, observed=True).em_ws.agg(["mean", "sem", "size"])
         ok = g["size"] >= 5; xs = [iv.mid for iv in g.index[ok]]
         ax.errorbar(xs, g["mean"][ok], yerr=g["sem"][ok], fmt="o-", color=c, ms=3, lw=0.8, capsize=1.5, zorder=4)
-    zero(ax); ax.set_xlabel("Rating, centred within participant × condition"); ax.set_ylabel("Block EM, centred")
+    zero(ax); ax.set_xlabel("Rating, centered within participant × condition"); ax.set_ylabel("Block EM, centered")
     yl = ax.get_ylim(); ax.set_ylim(yl[0], yl[1] + 0.18 * (yl[1] - yl[0])); ax.set_yticks([-0.4, -0.2, 0.0, 0.2, 0.4, 0.6])
     ax.text(0.02, 0.98, f"mixed-model rating slope b = {fit.params['rat_wc']:+.3f}, p = {fit.pvalues['rat_wc']:.2f}", transform=ax.transAxes, va="top", fontsize=FS)
     ax.legend(frameon=False, loc="lower right", handletextpad=0.3, markerscale=2.5)
@@ -593,5 +633,5 @@ def figureS2():
     print("Figure S2"); audit(fig); fig.savefig(OUT / "figure_S2.pdf"); fig.savefig(OUT / "figure_S2.png"); plt.close(fig)
 
 if __name__ == "__main__":
-    for f in sys.argv[1:] or ["1", "2", "3", "4", "S1", "S2", "S3", "S4"]:
+    for f in sys.argv[1:] or ["1", "2", "3", "4", "5", "S1", "S2", "S3", "S4"]:
         globals()[f"figure{f}"]()

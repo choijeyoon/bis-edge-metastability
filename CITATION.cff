@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this code or data, please cite the paper and this repository."
-title: "Pathogen-related images reduce cortical edge metastability: a specification-curve analysis of a block-design fMRI study (code and data)"
-version: "2.0.0"
-date-released: 2026-10-07
+title: "Infection-related images reduce cortical edge metastability: a specification-curve analysis of a block-design fMRI study (code and data)"
+version: "2.1.0"
+date-released: 2026-10-19
 authors:
   - family-names: Choi
     given-names: Jeyoon
@@ -18,7 +18,7 @@ authors:
     affiliation: "Institute of Development, Aging and Cancer, Tohoku University"
   - family-names: Deco
     given-names: Gustavo
-    affiliation: "Center for Brain and Cognition, Universitat Pompeu Fabra; ICREA"
+    affiliation: "Center for Brain and Cognition, Universitat Pompeu Fabra; ICREA; International Centre for Flourishing; Institut de Recerca Sant Joan de Déu"
 repository-code: "https://github.com/choijeyoon/bis-edge-metastability"
 license: MIT
 keywords:

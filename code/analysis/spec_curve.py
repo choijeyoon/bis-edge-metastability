@@ -1,7 +1,9 @@
 """Specification curve on correctly parcellated BIS time series (fMRIPrep MNI152NLin2009cAsym res-2 BOLD, templateflow
 Schaefer 2018 atlases in the same space). Identical definitions to src/supplementary/spec_curve.py; the parcellation
 dimension now has six levels (100, 200, 400, 600, 800, 1000) -> 480 specifications.
-usage: python3 spec_curve_corrected.py <BIS_edge root> [session]
+usage: python3 spec_curve.py <BIS_edge root> [session] [--from-deltas]
+  --from-deltas: recompute the summary and joint inference from an existing spec_curve_subject_deltas_S{ses}.csv,
+  dropping excluded runs (per-participant values do not depend on the other participants)
 writes bis_edge_metastability/results/tables/netneuro_corrected/{spec_curve_subject_deltas,spec_curve_summary,spec_curve_joint}_S{ses}.csv
 """
 import sys, re, itertools, time
@@ -12,6 +14,8 @@ from scipy import stats
 ROOT = Path(sys.argv[1]); SES = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 BIDS = ROOT / "fMRIPrep_BIDS"; PM = BIDS / "parcellation_multires"; OUT = ROOT / "bis_edge_metastability/results/tables/netneuro_corrected"; OUT.mkdir(parents=True, exist_ok=True)
 TR, DUMMY, BLK = 2.0, 4, 9
+# sub-01 run 2: the exported BOLD file is a copy of run 1 (identical NIfTI; the DICOM export holds series 201, EPI_S1); excluded
+INVALID = {(1, 2)}   # (participant, run)
 LAGS = [0, 1, 2, 3]; EMS = ["concat", "within", "between", "edgewise"]; ZTIMES = ["run", "cond"]; PARCS = [100, 200, 400, 600, 800, 1000]; GSRS = ["none", "gsr"]; BLOCKSETS = ["all", "common"]
 
 
@@ -51,10 +55,11 @@ def extract(ts, ev, lag, blockset):
     return out
 
 
-subs = sorted(int(m.group(1)) for p in PM.iterdir() if (m := re.match(r"sub-(\d+)$", p.name)) and (p / f"sub-{int(m.group(1)):02d}_S{SES}_schaefer1000.npy").exists())
+subs = sorted(int(m.group(1)) for p in PM.iterdir() if (m := re.match(r"sub-(\d+)$", p.name)) and (p / f"sub-{int(m.group(1)):02d}_S{SES}_schaefer1000.npy").exists() and (int(m.group(1)), SES) not in INVALID)
 print(len(subs), "subjects, session", SES, flush=True)
+FROM_DELTAS = "--from-deltas" in sys.argv
 rows = []; t0 = time.time()
-for sid in subs:
+for sid in ([] if FROM_DELTAS else subs):
     conf = pd.read_csv(BIDS / f"results/sub-{sid:02d}/ses-S{SES}/func/sub-{sid:02d}_ses-S{SES}_task-picrate_desc-confounds_timeseries.tsv", sep="\t")
     gs = conf["global_signal"].to_numpy()[DUMMY:]
     ev = pd.read_csv(BIDS / f"sub-{sid:02d}/func/sub-{sid:02d}_ses-S{SES}_task-picrate_events.tsv", sep="\t")
@@ -71,7 +76,11 @@ for sid in subs:
                             ei = em_value(bl["infection"], em, zt); en = em_value(bl["neutral"], em, zt)
                             rows.append(dict(sid=sid, lag=lag, em=em, ztime=zt, parc=f"schaefer{parc}", gsr=gsr, blockset=bs, n_inf=len(bl["infection"]), n_neu=len(bl["neutral"]), em_inf=ei, em_neu=en, delta=ei - en))
     print(f"  sub-{sid:02d} done ({time.time() - t0:.0f}s)", flush=True)
-df = pd.DataFrame(rows); df.to_csv(OUT / f"spec_curve_subject_deltas_S{SES}.csv", index=False)
+if FROM_DELTAS:
+    df = pd.read_csv(OUT / f"spec_curve_subject_deltas_S{SES}.csv"); df = df[[(sid, SES) not in INVALID for sid in df.sid]]
+else:
+    df = pd.DataFrame(rows)
+df.to_csv(OUT / f"spec_curve_subject_deltas_S{SES}.csv", index=False)
 keys = ["lag", "em", "ztime", "parc", "gsr", "blockset"]; rng = np.random.default_rng(20260911)
 piv = df.pivot_table(index="sid", columns=keys, values="delta"); D = piv.values; n = D.shape[0]
 d_obs = D.mean(0) / D.std(0, ddof=1); t_obs = d_obs * np.sqrt(n); p_t = 2 * stats.t.sf(np.abs(t_obs), n - 1); B = 10000

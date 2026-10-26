@@ -1,4 +1,4 @@
-# Pathogen-related images reduce cortical edge metastability: a specification-curve analysis of a block-design fMRI study
+# Infection-related images reduce cortical edge metastability: a specification-curve analysis of a block-design fMRI study
 
 Code and derived data for Choi, Berjaga-Buisan, Garcia-Guzman, Sugiura and Deco, *Network Neuroscience* (manuscript in preparation). Forty-four adults viewed alternating 18-s blocks of infection-related and neutral images in two fMRI runs; we ask whether the images reduce cortical edge metastability, and how much of the answer depends on analysis conventions.
 
@@ -22,13 +22,18 @@ code/
   extraction/extract_multires.py     parcellation of the fMRIPrep output (needs the imaging derivatives)
   analysis/recompute_schaefer400.py  global, network, parcel and block-level EM at 400 parcels (needs derivatives)
   analysis/spec_curve.py             480-specification curve with joint inference (needs derivatives)
+  analysis/control_analyses.py       evoked-response and nuisance controls, run 2 replication, condition-specific GSR,
+                                     alternating blocks, button counts, hemispheres, across-run covariance (needs derivatives)
+  analysis/composition_checks.py     covariance-matched surrogates and composition of the contrast (needs derivatives)
   analysis/secondary_analyses.py     everything downstream of the per-participant tables (runs from data/)
   analysis/validity_checks.py        test-retest of the contrast; block-level rating models (runs from data/)
-  figures/build_figures.py           Figures 1-4 and S1-S4 (runs from data/ and results/)
+  figures/build_figures.py           Figures 1-5 and S1-S4 (runs from data/ and results/)
   figures/render_brains.py           surface renders for Figures 2 and 4 (brainspace + surfplot)
   figures/render_fig1_brains.py      surface renders for Figure 1b
 CORRECTION.md              the two corrections, with before-and-after values
 ```
+
+Version 2.1.0 adds the control, composition and replication analyses and excludes run 2 of participant 1, whose exported run 2 file was a copy of run 1 (see `data/README.md`); all run 2 and across-run results use n = 43. Run 1 results are unchanged from 2.0.0.
 
 ## Reproducing the tables and figures from the released data
 
@@ -51,7 +56,7 @@ Parcel time series are z-scored (within run, or within the concatenated blocks o
 
 ## Citation
 
-See `CITATION.cff`. Please cite the paper and this repository (a versioned DOI is issued through Zenodo for each GitHub release).
+See `CITATION.cff`. Please cite the paper and this repository (release v2.1.0).
 
 ## Licence
 
